@@ -61,17 +61,19 @@ import (
 )
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: grepdiff regexp [file.diff ...]\n")
+	fmt.Fprintf(os.Stderr, "usage: grepdiff [-v] regexp [file.diff ...]\n")
 	// fmt.Fprintf(os.Stderr, "options:\n")
 	// flag.PrintDefaults()
 	os.Exit(2)
 }
 
 var exitStatus = 1
+var invertMatch *bool
 
 func main() {
 	log.SetFlags(0)
 	log.SetPrefix("grepdiff: ")
+	invertMatch = flag.Bool("v", false, "Invert the sense of matching")
 	flag.Usage = usage
 	flag.Parse()
 	if flag.NArg() < 1 {
@@ -132,16 +134,24 @@ func grepDiffData(re *regexp.Regexp, data []byte, name string) {
 			if hdr == nil {
 				hdr = diff[:cap(diff)-cap(hunk)]
 			}
-			if re.Match(hunk) {
-				os.Stdout.Write(hdr)
-				hdr = hdr[:0] // not nil
-				os.Stdout.Write(hunk)
-				if exitStatus == 1 {
-					exitStatus = 0
-				}
+			matched := re.Match(hunk)
+			if matched && !*invertMatch {
+				showOutput(hdr, hunk)
+			}
+			if !matched && *invertMatch {
+				showOutput(hdr, hunk)
 			}
 		})
 	})
+}
+
+func showOutput(hdr []byte, hunk []byte) {
+	os.Stdout.Write(hdr)
+	hdr = hdr[:0] // not nil
+	os.Stdout.Write(hunk)
+	if exitStatus == 1 {
+		exitStatus = 0
+	}
 }
 
 func forEach(x []byte, prefix string, f func([]byte)) {
